@@ -1,3 +1,7 @@
+// Root route for welcome message
+app.get('/', (req, res) => {
+  res.send('Welcome to the Task API! Visit /tasks for the API endpoints.');
+});
 const express = require('express');
 const taskRoutes = require('./routes/tasks');
 
