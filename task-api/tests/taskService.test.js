@@ -1,6 +1,22 @@
+
 const taskService = require('../src/services/taskService');
 
 describe('taskService', () => {
+  describe('assignTask', () => {
+    test('assignTask() assigns a user to an existing task', () => {
+      const t = taskService.create({ title: 'T' });
+      const updated = taskService.assignTask(t.id, 'alice');
+      expect(updated.assignee).toBe('alice');
+    });
+    test('assignTask() returns null for non-existent task', () => {
+      expect(taskService.assignTask('not-real-id', 'bob')).toBeNull();
+    });
+    test('assignTask() overwrites a previously assigned user (re-assignment works)', () => {
+      const t = taskService.create({ title: 'T', assignee: 'alice' });
+      taskService.assignTask(t.id, 'bob');
+      expect(taskService.findById(t.id).assignee).toBe('bob');
+    });
+  });
   afterEach(() => {
     taskService._reset();
   });
@@ -58,5 +74,78 @@ describe('taskService', () => {
     const task = taskService.create({ title: 'Persisted Task' });
     const all = taskService.getAll();
     expect(all).toContainEqual(task);
+  });
+
+  test('getAll() returns empty array when no tasks exist', () => {
+    taskService._reset();
+    expect(taskService.getAll()).toEqual([]);
+  });
+
+  test('getAll() returns all created tasks', () => {
+    taskService._reset();
+    const t1 = taskService.create({ title: 'T1' });
+    const t2 = taskService.create({ title: 'T2' });
+    expect(taskService.getAll()).toEqual([t1, t2]);
+  });
+
+  test('getAll() returns a copy, not a reference', () => {
+    taskService._reset();
+    taskService.create({ title: 'T1' });
+    const arr = taskService.getAll();
+    arr.push({ title: 'Fake' });
+    expect(taskService.getAll().length).toBe(1);
+  });
+
+  test('findById() returns correct task for a valid ID', () => {
+    taskService._reset();
+    const task = taskService.create({ title: 'Find Me' });
+    expect(taskService.findById(task.id)).toEqual(task);
+  });
+
+  test('findById() returns undefined for a non-existent ID', () => {
+    taskService._reset();
+    expect(taskService.findById('not-a-real-id')).toBeUndefined();
+  });
+
+  describe('getByStatus()', () => {
+    beforeEach(() => taskService._reset());
+    test('returns only tasks with the exact matching status', () => {
+      const t1 = taskService.create({ title: 'T1', status: 'todo' });
+      const t2 = taskService.create({ title: 'T2', status: 'in_progress' });
+      expect(taskService.getByStatus('todo')).toEqual([t1]);
+      expect(taskService.getByStatus('in_progress')).toEqual([t2]);
+    });
+    test('returns empty array when no tasks match', () => {
+      taskService.create({ title: 'T1', status: 'todo' });
+      expect(taskService.getByStatus('done')).toEqual([]);
+    });
+    test('catches bug: substring match instead of exact', () => {
+      const t1 = taskService.create({ title: 'T1', status: 'in_progress' });
+      // Should not match 'in' to 'in_progress'
+      expect(taskService.getByStatus('in')).toEqual([]);
+    });
+  });
+
+  describe('getPaginated()', () => {
+    beforeEach(() => taskService._reset());
+    test('page 1 returns the first limit items', () => {
+      const t1 = taskService.create({ title: 'T1' });
+      const t2 = taskService.create({ title: 'T2' });
+      const t3 = taskService.create({ title: 'T3' });
+      expect(taskService.getPaginated(1, 2)).toEqual([t1, t2]);
+    });
+    test('catches bug: page 1 skips all first-page results (off-by-one)', () => {
+      const t1 = taskService.create({ title: 'T1' });
+      const t2 = taskService.create({ title: 'T2' });
+      expect(taskService.getPaginated(1, 2)).toEqual([t1, t2]);
+    });
+    test('returns empty array for out-of-range page', () => {
+      taskService.create({ title: 'T1' });
+      expect(taskService.getPaginated(10, 2)).toEqual([]);
+    });
+    test('handles limit larger than total tasks', () => {
+      const t1 = taskService.create({ title: 'T1' });
+      expect(taskService.getPaginated(1, 10)).toEqual([t1]);
+    });
   });
 });
